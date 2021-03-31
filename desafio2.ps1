@@ -201,10 +201,11 @@ az network nic create `
 
 # VIRTUAL MACHINES
 Write-Host ------------------------------
-Write-Host Criando as Máquinas Virtuais $VM1Name e $VM2Name
+Write-Host Criando as Maquinas Virtuais $VM1Name e $VM2Name
 az vm create `
   --resource-group $ResourceGroupName `
   --name $VM1Name `
+  --size $VMSize `
   --admin-username $AdminUsername `
   --admin-password $AdminPassword `
   --nic $VM1Name-nic `
@@ -250,6 +251,7 @@ az vm extension set `
 az vm create `
   --resource-group $ResourceGroupName `
   --name $VM2Name `
+  --size $VMSize `
   --admin-username $AdminUsername `
   --admin-password $AdminPassword `
   --nic $VM2Name-nic `
