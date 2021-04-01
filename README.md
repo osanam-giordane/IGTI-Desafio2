@@ -6,6 +6,9 @@
 
 O script foi criado em Powershell usando o Modulo AzureRM e o Azure CLI. 
 
+## Topologia
+
+![alt text](https://willianromaocursos.blob.core.windows.net/public/IGTI-Desafio2.png)
 
 ## Execução
 
@@ -17,6 +20,8 @@ cd IGTI-Desafio2
 ./desafio2.ps1
 ```
 
-### Observação
+### Observações
 
-Após concluído o deploy do ambiente será necessário ativar o recurso Run As Account na conta do Azure Automation para que os scripts funcionem corretamente.
+1-Após concluído o deploy do ambiente será necessário ativar o recurso Run As Account na conta do Azure Automation para que os scripts funcionem corretamente.
+
+2-O agendamento do backup está comentado no script das linhas 466 a 478. O agendamento cria o travamento de segurança de 14 dias no Recovery Services Vault.
