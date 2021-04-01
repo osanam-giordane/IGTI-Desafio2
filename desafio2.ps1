@@ -16,13 +16,25 @@ $VMSize="Standard_B4ms"
 $StorageAccountName=("0123456789abcdefghijklmnopqrstuvwxyz".tochararray() | Sort-Object {Get-Random})[0..8] -join ''
 $StorageAccountName="igtidesafio2$StorageAccountName"
 $StorageFileShareName="fileshare"
-$AutomationStartTime = (Get-Date "11:00:00").AddDays(1)
-$AutomationStopTime = (Get-Date "21:00:00").AddDays(1)
-$AutomationTimeZone = "America/Sao_Paulo"
+$AutomationStartTime =(Get-Date "11:00:00").AddDays(1)
+$AutomationStopTime=(Get-Date "21:00:00").AddDays(1)
+$AutomationTimeZone="America/Sao_Paulo"
+$BackupStorageRedundancy="LocallyRedundant"
+$ACRName=("0123456789abcdefghijklmnopqrstuvwxyz".tochararray() | Sort-Object {Get-Random})[0..8] -join ''
+$ACRName="igtidesafio2acr$ACRName"
+$ACRImageName="igtidesafio2image"
+$ACRImageRelease="igtidesafio2image:v1"
+$ACIName="igtidesafio2aci"
+$KeyVaultName=("0123456789abcdefghijklmnopqrstuvwxyz".tochararray() | Sort-Object {Get-Random})[0..8] -join ''
+$KeyVaultName="igtidesafio2kv$KeyVaultName"
+$GitRepoACI="https://github.com/willianromao/acr-build-helloworld-node.git"
+$GitRepoACIPath="acr-build-helloworld-node"
 $AdminUsername=whoami
 $AdminUsername=$AdminUsername.Split("\")[0]
 $AdminPassword=("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".tochararray() | Sort-Object {Get-Random})[0..14] -join ''
 $AdminPassword="$AdminPassword@@"
+echo "Username: $AdminUsername" > Login.txt
+echo "Password: $AdminPassword" >> Login.txt
 
 # SUBSCRIPTION
 $subscription=@(az account list --query [].id -o tsv)
@@ -40,6 +52,7 @@ if ($subscription.Count -gt 1)
 
 # RESOURCE GROUP
 Write-Host Criando o RG $ResourceGroupName
+
 az group create `
   --location $Location `
   --resource-group $ResourceGroupName `
@@ -48,6 +61,7 @@ az group create `
 # AZURE POLICY
 Write-Host ------------------------------
 Write-Host Criando a Policy AutoTag
+
 az policy assignment create `
   --display-name "AutoTag" `
   --policy "2a0e14a6-b0a6-4fab-991a-187a4f81c498" `
@@ -59,6 +73,7 @@ az policy assignment create `
 # VNET E NSG
 Write-Host ------------------------------
 Write-Host Criando a vNet $vNetName
+
 az network vnet create `
   --resource-group $ResourceGroupName `
   --name $vNetName `
@@ -101,6 +116,7 @@ az network vnet subnet update `
 # STORAGE ACCOUT
 Write-Host ------------------------------
 Write-Host Criando a Storage Account $StorageAccountName
+
 az storage account create `
   --name $StorageAccountName `
   --resource-group $ResourceGroupName `
@@ -139,6 +155,7 @@ az storage account update `
 # LOAD BALANCER
 Write-Host ------------------------------
 Write-Host Criando o LoadBalancer $ResourceGroupName-LB
+
 az network public-ip create `
   --resource-group $ResourceGroupName `
   --name $ResourceGroupName-LB-pip `
@@ -146,6 +163,11 @@ az network public-ip create `
   --zone 3 `
   --version IPv4 `
   --output none
+$LBpip=(az network public-ip show `
+  --resource-group $ResourceGroupName `
+  --name $ResourceGroupName-LB-pip `
+  --query ipAddress `
+  --output tsv)
 
 az network lb create `
   --resource-group $ResourceGroupName `
@@ -201,7 +223,8 @@ az network nic create `
 
 # VIRTUAL MACHINES
 Write-Host ------------------------------
-Write-Host Criando as Maquinas Virtuais $VM1Name e $VM2Name
+Write-Host Criando a Maquina Virtual $VM1Name
+
 az vm create `
   --resource-group $ResourceGroupName `
   --name $VM1Name `
@@ -214,11 +237,11 @@ az vm create `
   --output none 
   
 az vm disk attach `
-   --resource-group $ResourceGroupName `
-   --vm-name $VM1Name `
-   --name $VM1Name-Extra `
-   --new `
-   --size-gb 100 `
+  --resource-group $ResourceGroupName `
+  --vm-name $VM1Name `
+  --name $VM1Name-Extra `
+  --new `
+  --size-gb 100 `
   --output none
 
 az vm extension set `
@@ -239,14 +262,8 @@ az vm extension set `
   --settings "{'commandToExecute':'mkdir /mnt/$StorageFileShareName && echo //$StorageAccountName.file.core.windows.net/$StorageFileShareName /mnt/$StorageFileShareName cifs nofail,vers=3.0,username=$StorageAccountName,password=$StorageAccountKey,dir_mode=0777,file_mode=0777,serverino >> /etc/fstab && mount -t cifs //$StorageAccountName.file.core.windows.net/$StorageFileShareName /mnt/$StorageFileShareName -o vers=3.0,username=$StorageAccountName,password=$StorageAccountKey,dir_mode=0777,file_mode=0777,serverino && hostname > /mnt/$StorageFileShareName/teste.txt  '}" `
   --output none
 
-az vm extension set `
-  --publisher Microsoft.Azure.Extensions `
-  --version 2.0 `
-  --name CustomScript `
-  --vm-name $VM1Name `
-  --resource-group $ResourceGroupName `
-  --settings "{'commandToExecute':'sudo parted /dev/sdc --script mklabel gpt mkpart xfspart xfs 0% 100% && sudo mkfs.xfs /dev/sdc1 && sudo partprobe /dev/sdc1 && sudo mkdir /mnt/$VM1Name-Extra && sudo mount /dev/sdc1 /mnt/$VM1Name-Extra && sudo echo /dev/sdc1  /mnt/$VM1Name-Extra   xfs   defaults,nofail   1   2 >> /etc/fstab'}" `
-  --output none
+Write-Host ------------------------------
+Write-Host Criando a Maquina Virtual $VM2Name
 
 az vm create `
   --resource-group $ResourceGroupName `
@@ -260,11 +277,11 @@ az vm create `
   --output none
 
 az vm disk attach `
-   --resource-group $ResourceGroupName `
-   --vm-name $VM2Name `
-   --name $VM2Name-Extra `
-   --new `
-   --size-gb 100 `
+  --resource-group $ResourceGroupName `
+  --vm-name $VM2Name `
+  --name $VM2Name-Extra `
+  --new `
+  --size-gb 100 `
   --output none
 
 az vm extension set `
@@ -285,18 +302,10 @@ az vm extension set `
   --settings "{'commandToExecute':'mkdir /mnt/$StorageFileShareName && echo //$StorageAccountName.file.core.windows.net/$StorageFileShareName /mnt/$StorageFileShareName cifs nofail,vers=3.0,username=$StorageAccountName,password=$StorageAccountKey,dir_mode=0777,file_mode=0777,serverino >> /etc/fstab && mount -t cifs //$StorageAccountName.file.core.windows.net/$StorageFileShareName /mnt/$StorageFileShareName -o vers=3.0,username=$StorageAccountName,password=$StorageAccountKey,dir_mode=0777,file_mode=0777,serverino && hostname >> /mnt/$StorageFileShareName/teste.txt '}" `
   --output none
 
-az vm extension set `
-  --publisher Microsoft.Azure.Extensions `
-  --version 2.0 `
-  --name CustomScript `
-  --vm-name $VM2Name `
-  --resource-group $ResourceGroupName `
-  --settings "{'commandToExecute':'sudo parted /dev/sdc --script mklabel gpt mkpart xfspart xfs 0% 100% && sudo mkfs.xfs /dev/sdc1 && sudo partprobe /dev/sdc1 && sudo mkdir /mnt/$VM2Name-Extra && sudo mount /dev/sdc1 /mnt/$VM2Name-Extra && sudo echo /dev/sdc1  /mnt/$VM2Name-Extra   xfs   defaults,nofail   1   2 >> /etc/fstab'}" `
-  --output none
-  
 # AUTOMATION
 Write-Host ------------------------------
 Write-Host Criando o Azure Automation
+
 az automation account create `
   --automation-account-name "$ResourceGroupName-Automation" `
   --resource-group $ResourceGroupName `
@@ -436,9 +445,118 @@ Register-AzureRMAutomationScheduledRunbook `
   -ResourceGroupName $ResourceGroupName `
   -AutomationAccountName $ResourceGroupName-Automation > $null
 
+# BACKUP
+Write-Host ------------------------------
+Write-Host Criando o Recovery Services Vault
+
+az backup vault create `
+  --resource-group $ResourceGroupName `
+  --name $ResourceGroupName-Vault `
+  --location $Location `
+  --output none
+  
+az backup policy create `
+  --backup-management-type AzureIaasVM `
+  --name $ResourceGroupName-Policy `
+  --resource-group $ResourceGroupName `
+  --vault-name $ResourceGroupName-Vault `
+  --output none `
+  --policy '{\"eTag\": null,\"id\":\"/Subscription/$subscription/resourceGroups/$ResourceGroupName/providers/Microsoft.RecoveryServices/vaults/$ResourceGroupName-Vault/backupPolicies/$ResourceGroupName-Policy\",\"location\": null,\"name\":\"$ResourceGroupName-Policy\",\"properties\":{\"backupManagementType\":\"AzureIaasVM\",\"instantRpDetails\":{\"azureBackupRgNamePrefix\":null,\"azureBackupRgNameSuffix\":null},\"instantRpRetentionRangeInDays\":2,\"protectedItemsCount\":0,\"retentionPolicy\":{\"dailySchedule\":{\"retentionDuration\":{\"count\":7,\"durationType\":\"Days\"},\"retentionTimes\":[\"2021-01-01T04:30:00+00:00\"]},\"monthlySchedule\": null,\"retentionPolicyType\":\"LongTermRetentionPolicy\",\"weeklySchedule\":null,\"yearlySchedule\":null},\"schedulePolicy\":{\"schedulePolicyType\":\"SimpleSchedulePolicy\",\"scheduleRunDays\":null,\"scheduleRunFrequency\":\"Daily\",\"scheduleRunTimes\":[\"2021-01-01T04:30:00+00:00\"],\"scheduleWeeklyFrequency\":0},\"timeZone\":\"UTC\"},\"resourceGroup\":\"$ResourceGroupName\",\"tags\":null,\"type\":\"Microsoft.RecoveryServices/vaults/backupPolicies\"}'
+  
+#az backup protection enable-for-vm `
+#  --resource-group $ResourceGroupName `
+#  --vault-name $ResourceGroupName-Vault `
+#  --vm $VM1Name `
+#  --policy-name $ResourceGroupName-Policy `
+#  --output none
+
+#az backup protection enable-for-vm `
+#  --resource-group $ResourceGroupName `
+#  --vault-name $ResourceGroupName-Vault `
+#  --vm $VM2Name `
+#  --policy-name $ResourceGroupName-Policy `
+#  --output none
+
+# CONTAINERS
+Write-Host ------------------------------
+Write-Host Criando a ACR e KeyVault
+
+az acr create `
+  --resource-group $ResourceGroupName `
+  --name $ACRName `
+  --sku Basic `
+  --output none
+
+git clone $GitRepoACI 1> $null 2> $null
+
+az acr build `
+  --registry $ACRName `
+  --image $ACRImageRelease ./$GitRepoACIPath `
+  --output none 1> $null 2> $null
+
+az keyvault create `
+  --resource-group $ResourceGroupName `
+  --name $KeyVaultName `
+  --output none 
+  
+az keyvault secret set `
+  --vault-name $KeyVaultName `
+  --name pull-pwd `
+  --value $(az ad sp create-for-rbac `
+  --name $ACRName-pull `
+  --scopes $(az acr show --name $ACRName --query id --output tsv) `
+  --role acrpull `
+  --query password `
+  --output tsv) `
+  --output none 1> $null 2> $null
+				
+az keyvault secret set `
+  --vault-name $KeyVaultName `
+  --name pull-usr `
+  --value $(az ad sp show --id http://$ACRName-pull --query appId --output tsv) `
+  --output none 
+	
+$KeyVaultUser=(az keyvault secret show --vault-name $KeyVaultName --name pull-usr --query value -o tsv)
+$KeyVaultPass=(az keyvault secret show --vault-name $KeyVaultName --name pull-pwd --query value -o tsv)
+
+Write-Host ------------------------------
+Write-Host Montando o disco extra das VMs
+
+az vm extension set `
+  --publisher Microsoft.Azure.Extensions `
+  --version 2.0 `
+  --name CustomScript `
+  --vm-name $VM1Name `
+  --resource-group $ResourceGroupName `
+  --settings "{'commandToExecute':'sudo parted /dev/sdc --script mklabel gpt mkpart xfspart xfs 0% 100% && sudo mkfs.xfs /dev/sdc1 && sudo partprobe /dev/sdc1 && sudo mkdir /mnt/$VM1Name-Extra && sudo mount /dev/sdc1 /mnt/$VM1Name-Extra && sudo echo /dev/sdc1  /mnt/$VM1Name-Extra   xfs   defaults,nofail   1   2 >> /etc/fstab'}" `
+  --output none
+  
+az vm extension set `
+  --publisher Microsoft.Azure.Extensions `
+  --version 2.0 `
+  --name CustomScript `
+  --vm-name $VM2Name `
+  --resource-group $ResourceGroupName `
+  --settings "{'commandToExecute':'sudo parted /dev/sdc --script mklabel gpt mkpart xfspart xfs 0% 100% && sudo mkfs.xfs /dev/sdc1 && sudo partprobe /dev/sdc1 && sudo mkdir /mnt/$VM2Name-Extra && sudo mount /dev/sdc1 /mnt/$VM2Name-Extra && sudo echo /dev/sdc1  /mnt/$VM2Name-Extra   xfs   defaults,nofail   1   2 >> /etc/fstab'}" `
+  --output none
+
+Write-Host ------------------------------
+Write-Host Criando o Container no ACI
+
+$ContainerURL=(az container create `
+    --resource-group $ResourceGroupName `
+    --name $ACIName `
+    --image "$ACRName.azurecr.io/$ACRImageRelease" `
+    --registry-login-server "$ACRName.azurecr.io" `
+    --registry-username $KeyVaultUser `
+    --registry-password $KeyVaultPass `
+    --dns-name-label $ACRName `
+    --query "{FQDN:ipAddress.fqdn}" `
+    --output tsv) 
+
 Write-Host ------------------------------
 Write-Host Deploy Finalizado!
-echo "Username: $AdminUsername"
-echo "Password: $AdminPassword"
-echo "Username: $AdminUsername" > Login.txt
-echo "Password: $AdminPassword" >> Login.txt
+echo "VM Username: $AdminUsername"
+echo "VM Password: $AdminPassword"
+echo "LoadBalancer: http://$LBpip/"
+echo "Container: http://$ContainerURL/"
